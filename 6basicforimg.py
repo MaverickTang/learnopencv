@@ -1,3 +1,4 @@
+# 图像的基本处理，有属性（重点是数据类型），图像通道分离和结合
 import numpy as np
 import cv2 as cv
 img=cv.imread('cyber2.jpg')
@@ -21,6 +22,19 @@ print(img.item(10,10,2))
 # 修改 RED 值
 img.itemset((10,10,2),100)
 
+
+## 图像感兴趣区域ROI
+# 选择某部分并复制到另一个区域
+ball = img[280:340, 330:390]
+img[273:333, 100:160] = ball 
+
+## 拆分和合并图像通道
+b,g,r = cv.split(img)
+img = cv.merge((b,g,r))
+# 或者
+blue=img[:,:,0]
+# 将所有红色像素置0
+img [:, :, 2] = 0
 
 # 展示图片
 cv.imshow('image',img)

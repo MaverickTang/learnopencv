@@ -37,65 +37,54 @@ def straighten_horizon(im, lhs, rhs):
 def equirectangular_to_tiny_planet(frame, lhs=2000, rhs=1400):
     # Convert OpenCV image (BGR) to PIL image (RGB)
     linear_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
     # Straighten the horizon
     linear_image = straighten_horizon(linear_image, lhs, rhs)
     linear_image = linear_image.transpose(Image.FLIP_TOP_BOTTOM)
-
     imgX, imgY = linear_image.size
-
     # Create the output image
-    circle_image = Image.new("RGBA", (imgX, imgY), (255, 255, 255, 0))
-
-    # Rectangle to polar coordinates
-    maxradius = imgX / 2
-    rscale = imgX / maxradius
-    tscale = imgY / (2 * math.pi)
-
-    for y in range(0, imgY):
-        dy = y - imgY // 2
-        for x in range(0, imgX):
-            dx = x - imgX // 2
-            t = math.atan2(dy, dx) % (2 * math.pi) * tscale
-            r = math.sqrt(dx**2 + dy**2) * rscale
-
-            if 0 <= t < imgX and 0 <= r < imgY:
-                circle_image.putpixel((x, y), linear_image.getpixel((int(t), int(r))))
-
+    circle_image = np.zeros((imgY, imgX, 3), dtype=np.uint8)
+    # Convert image to numpy array for faster pixel manipulation
+    linear_array = np.array(linear_image)
+    # Generate mesh grid for coordinates
+    X, Y = np.meshgrid(np.arange(imgX), np.arange(imgY))
+    # Calculate coordinate
+    dx = X - imgX // 2
+    dy = Y - imgY // 2
+    t = np.arctan2(dy, dx) % (2 * np.pi)
+    r = np.sqrt(dx**2 + dy**2)
+    # Scale coordinates
+    t_scaled = (t * imgX / (2 * np.pi)).astype(int)
+    r_scaled = (r * imgY / (imgX / 2)).astype(int)
+    # Clip coordinates to avoid out-of-bounds errors
+    t_scaled = np.clip(t_scaled, 0, imgX - 1)
+    r_scaled = np.clip(r_scaled, 0, imgY - 1)
+    # Map pixels from linear array to circular array
+    circle_image[Y, X] = linear_array[r_scaled, t_scaled]
+    # Convert NumPy array back to PIL image
+    circle_image = Image.fromarray(circle_image, "RGB")
     # Convert PIL image back to OpenCV image
-    return cv2.cvtColor(np.array(circle_image), cv2.COLOR_RGBA2BGR)
-    # return cv2.cvtColor(np.array(linear_image), cv2.COLOR_RGBA2BGR)
+    return cv2.cvtColor(np.array(circle_image), cv2.COLOR_RGB2BGR)
 
 def main():
     cap = cv2.VideoCapture(0)
-
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return
-
     # Set the frame rate
-    frame_rate = 30
+    frame_rate = 10
     prev = 0
-
     while True:
         time_elapsed = cv2.getTickCount() / cv2.getTickFrequency() - prev
-
         if time_elapsed > 1.0 / frame_rate:
             prev = cv2.getTickCount() / cv2.getTickFrequency()
-
             ret, frame = cap.read()
-
             if not ret:
                 break
-
             # Convert frame to tiny planet effect
             tiny_planet_frame = equirectangular_to_tiny_planet(frame)
-
             cv2.imshow('Tiny Planet Effect', tiny_planet_frame)
-
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
     cap.release()
     cv2.destroyAllWindows()
 
